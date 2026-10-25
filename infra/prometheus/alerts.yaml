@@ -1,0 +1,143 @@
+groups:
+  - name: aegisops-lab
+    rules:
+      - alert: LabServiceUnreachable
+        expr: lab_probe_success == 0
+        for: 10s
+        labels:
+          severity: critical
+          resource: '{{ $labels.service }}'
+          signal_type: availability
+        annotations:
+          summary: Business Lab service health probe failed
+      - alert: LabBusinessContractViolation
+        expr: |
+          (lab_probe_assertion_success == 0)
+          and on (name, service) (lab_probe_assertion_evaluated == 1)
+        for: 10s
+        labels:
+          severity: critical
+          resource: '{{ $labels.name }}'
+          signal_type: data_integrity
+        annotations:
+          summary: Configured business response invariant failed
+      - alert: LabCheckoutLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le) (
+            rate(http_server_duration_milliseconds_bucket{
+              service_name="lab-gateway",http_target="/checkout",http_status_code="200"
+            }[1m])
+          )) > 500
+          and
+          sum(increase(http_server_duration_milliseconds_count{
+            service_name="lab-gateway",http_target="/checkout",http_status_code="200"
+          }[1m])) >= 5
+        for: 10s
+        labels:
+          severity: warning
+          service: lab-gateway
+          resource: checkout
+          signal_type: latency
+        annotations:
+          summary: Checkout p95 latency exceeded the Lab 500ms objective
+      - alert: LabContainerOOMKill
+        expr: sum by (service) (increase(lab_container_oom_kills_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          resource: '{{ $labels.service }}'
+          signal_type: resource_exhaustion
+        annotations:
+          summary: A business container had an OOM kill event
+      - alert: PaymentRedisUnavailable
+        expr: sum(increase(lab_payment_redis_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: payment-service
+          resource: redis-main
+          signal_type: availability
+        annotations:
+          summary: Payment requests are failing because Redis is unavailable
+      - alert: OrderInventoryUnavailable
+        expr: sum(increase(lab_order_inventory_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: inventory-service
+          signal_type: availability
+        annotations:
+          summary: Orders are failing because inventory service is unavailable
+      - alert: OrderDependencyFailure
+        expr: sum by (dependency, failure) (increase(lab_order_dependency_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: '{{ $labels.dependency }}'
+          signal_type: availability
+        annotations:
+          summary: Order dependency call failed
+      - alert: OrderBusinessContractRejected
+        expr: sum by (contract_id) (increase(lab_order_business_contract_rejections_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: '{{ $labels.contract_id }}'
+          signal_type: data_integrity
+        annotations:
+          summary: Checkout was rejected before payment by an independent business contract
+      - alert: OrderDbPoolExhausted
+        expr: sum(increase(lab_order_db_pool_lease_saturation_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: order-db-pool
+          signal_type: saturation
+        annotations:
+          summary: Order requests cannot acquire a business database connection
+      - alert: OrderDatabaseConnectivityFailure
+        expr: sum(increase(lab_order_db_connectivity_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: orders-postgres
+          signal_type: availability
+        annotations:
+          summary: Order requests cannot reach the business database
+      - alert: OrderDatabaseAcquisitionUncertain
+        expr: sum(increase(lab_order_db_pool_ambiguous_timeouts_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: order-db-pool
+          signal_type: availability
+        annotations:
+          summary: Order database acquisition failed without confirmed pool saturation
+      - alert: OrderBadDeployment
+        expr: sum by (change_id) (increase(lab_order_deployment_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: order-service
+          resource: order-service
+          signal_type: deployment
+          signal_role: fault
+        annotations:
+          summary: A faulty order deployment is rejecting checkouts
+      - alert: GatewayOrderFailures
+        expr: sum by (change_id) (increase(lab_gateway_order_failures_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: lab-gateway
+          resource: order-service
+          signal_type: availability
+          signal_role: symptom
+        annotations:
+          summary: Gateway checkouts are failing at the order service

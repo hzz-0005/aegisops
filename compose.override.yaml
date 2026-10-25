@@ -1,0 +1,12 @@
+# Local-only override: host ports occupied by other local projects are avoided.
+# 5433 belongs to the rag project database; 8000 belongs to the rag project API;
+# 8010 belongs to geomodel-agent. AegisOps keeps its internal service names and
+# only moves host bindings. Host-side scripts can override endpoints with
+# AEGISOPS_API_URL / AEGISOPS_CONSOLE_URL and the business DB URL variables.
+services:
+  lab-orders-postgres:
+    ports: !override
+      - "5434:5432"
+  api:
+    ports: !override
+      - "18000:8000"

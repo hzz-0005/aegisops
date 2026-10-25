@@ -1,0 +1,8 @@
+{
+  "evaluation_scope": "regression_existing_variants_after_telemetry_changes",
+  "oracle_basis": "isolated existing fault mechanisms; original truth definitions retained; injection labels never sent to incident engine",
+  "samples": [
+    {"sample_id": "inventory-exit-after-refresh", "source_report": "eval/fault-battery-20261011T104347Z.json", "fault": "inventory_process_stopped", "source_repeat": 1, "injected_root": "inventory_process_exit", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []},
+    {"sample_id": "inventory-lock-after-ancestry", "source_report": "eval/fault-battery-20261011T105045Z.json", "fault": "inventory_table_read_blocked", "source_repeat": 1, "injected_root": "inventory_database_table_lock", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []}
+  ]
+}

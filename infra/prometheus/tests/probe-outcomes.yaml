@@ -1,0 +1,43 @@
+rule_files:
+  - /etc/prometheus/alerts.yaml
+evaluation_interval: 5s
+tests:
+  - name: unavailable-assertion-is-not-integrity-violation
+    interval: 5s
+    input_series:
+      - series: 'lab_probe_assertion_success{service="inventory-service",name="currency"}'
+        values: '0 0 0 0 0'
+      - series: 'lab_probe_assertion_evaluated{service="inventory-service",name="currency"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: LabBusinessContractViolation
+        exp_alerts: []
+  - name: missing-evaluation-is-not-integrity-violation
+    interval: 5s
+    input_series:
+      - series: 'lab_probe_assertion_success{service="inventory-service",name="currency"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: LabBusinessContractViolation
+        exp_alerts: []
+  - name: observed-violation-still-alerts
+    interval: 5s
+    input_series:
+      - series: 'lab_probe_assertion_success{service="inventory-service",name="currency"}'
+        values: '0 0 0 0 0'
+      - series: 'lab_probe_assertion_evaluated{service="inventory-service",name="currency"}'
+        values: '1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: LabBusinessContractViolation
+        exp_alerts:
+          - exp_labels:
+              service: inventory-service
+              name: currency
+              resource: currency
+              severity: critical
+              signal_type: data_integrity
+            exp_annotations:
+              summary: Configured business response invariant failed

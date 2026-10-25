@@ -1,0 +1,17 @@
+route:
+  receiver: aegisops-api
+  group_by: [alertname, service]
+  group_wait: 0s
+  group_interval: 10s
+  repeat_interval: 1h
+
+receivers:
+  - name: aegisops-api
+    webhook_configs:
+      - url: http://api:8000/api/v1/alerts/ingest
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: aegisops_dev_only
+

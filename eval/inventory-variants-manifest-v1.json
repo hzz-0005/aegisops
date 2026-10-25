@@ -1,0 +1,9 @@
+{
+  "oracle_basis": "one isolated Lab fault per clean-baseline sample; injection truth never sent to incident engine",
+  "samples": [
+    {"sample_id": "inventory-exit-1", "source_report": "eval/fault-battery-20261011T054216Z.json", "fault": "inventory_process_stopped", "source_repeat": 1, "injected_root": "inventory_process_exit", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []},
+    {"sample_id": "inventory-exit-2", "source_report": "eval/fault-battery-20261011T054216Z.json", "fault": "inventory_process_stopped", "source_repeat": 2, "injected_root": "inventory_process_exit", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []},
+    {"sample_id": "inventory-lock-1", "source_report": "eval/fault-battery-20261011T054216Z.json", "fault": "inventory_table_read_blocked", "source_repeat": 1, "injected_root": "inventory_database_table_lock", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []},
+    {"sample_id": "inventory-lock-2", "source_report": "eval/fault-battery-20261011T094600Z.json", "fault": "inventory_table_read_blocked", "source_repeat": 1, "injected_root": "inventory_database_table_lock", "compatible_domains": ["inventory_unavailable"], "exact_hypotheses": [], "allowed_actions": []}
+  ]
+}

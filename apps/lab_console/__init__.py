@@ -1,0 +1,1 @@
+"""Local interactive Lab console."""

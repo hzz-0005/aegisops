@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AegisOps · 电商故障实验台</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">A</span><span>AegisOps <small>Lab</small></span></div>
+        <nav class="topnav" aria-label="主导航">
+          <button class="nav-button active" data-view="shop" type="button">业务商城</button>
+          <button class="nav-button" data-view="ops" type="button">事故控制台</button>
+        </nav>
+        <div class="system-indicator"><span id="health-dot" class="dot"></span><span id="health-text">检查服务中</span></div>
+      </header>
+
+      <main>
+        <section id="shop-view" class="view">
+          <div class="shop-heading">
+            <div>
+              <p class="kicker">可操作的电商实验业务</p>
+              <h1>从一次下单，看到一次事故。</h1>
+              <p class="lead">这里的商品、库存、订单和付款都走运行中的 Lab 微服务。付款由模拟渠道完成，不会产生真实扣款。</p>
+            </div>
+            <button id="open-ops" class="quiet-link" type="button">查看运维现场 <span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="shop-layout">
+            <section class="catalog-panel" aria-labelledby="catalog-title">
+              <div class="section-head"><h2 id="catalog-title">商品目录</h2><span id="catalog-count" class="small-muted">正在加载</span></div>
+              <div id="catalog" class="catalog-grid"></div>
+            </section>
+            <aside class="checkout-panel" aria-labelledby="checkout-title">
+              <div class="section-head"><h2 id="checkout-title">结账台</h2><span class="small-muted">单件商品订单</span></div>
+              <div id="selected-product" class="selected-product">请先选择商品</div>
+              <label for="quantity">数量</label>
+              <div class="qty-control"><button id="qty-minus" type="button" aria-label="减少数量">−</button><input id="quantity" type="number" min="1" max="100" value="1" inputmode="numeric" /><button id="qty-plus" type="button" aria-label="增加数量">+</button></div>
+              <div class="total-line"><span>订单金额</span><strong id="order-total">¥0.00</strong></div>
+              <button id="checkout-button" class="primary-button" type="button" disabled>提交模拟订单</button>
+              <p class="helper">请求失败时可用同一订单键重试，避免重复付款。</p>
+              <div id="checkout-result" class="result-panel" role="status" aria-live="polite"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="ops-view" class="view hidden">
+          <div class="ops-heading">
+            <div>
+              <p class="kicker">AegisOps / Incident workspace</p>
+              <h1>事故工作台</h1>
+              <p class="lead">从告警到调查、建议和审批，沿着证据查看每一步。</p>
+            </div>
+            <div class="ops-heading-actions"><span id="last-refresh" class="small-muted">等待同步</span><button id="refresh-button" class="secondary-button" type="button">刷新现场</button></div>
+          </div>
+          <div class="ops-summary" aria-label="事故概览">
+            <div class="summary-cell"><span>当前未结</span><strong id="stat-open">—</strong><small>需要继续关注</small></div>
+            <div class="summary-cell"><span>调查进行中</span><strong id="stat-investigating">—</strong><small>工作流正在处理</small></div>
+            <div class="summary-cell"><span>已归档事故</span><strong id="stat-resolved">—</strong><small>可回看证据与审计</small></div>
+            <div class="summary-context"><span class="summary-pulse"></span><span>开发环境 · 模拟付款<br><strong>真实容器故障与遥测</strong></span></div>
+          </div>
+          <section class="detector-strip" aria-labelledby="detector-title">
+            <div><strong id="detector-title">请求失败监测</strong><span id="detector-summary" class="small-muted">正在读取</span></div>
+            <p id="detector-detail">监测结果仅是请求失败症状，不自动判断根因或执行修复。</p>
+            <details><summary>已核验请求症状 · 送入调查</summary>
+              <p>这些是历史窗口内的失败事实；送入调查不表示故障仍持续，也不执行修复。</p>
+              <div id="request-signal-list"></div>
+            </details>
+          </section>
+          <div class="ops-workspace">
+            <aside class="ops-sidebar">
+              <section class="incident-panel" aria-labelledby="incident-title">
+                <div class="section-head"><h2 id="incident-title">事故队列</h2><span id="incident-count" class="small-muted">正在加载</span></div>
+                <label class="search-field"><span class="sr-only">搜索事故</span><input id="incident-filter" type="search" placeholder="搜索事故标题" autocomplete="off" /></label>
+                <div id="incidents" class="incident-list"></div>
+              </section>
+              <details id="lab-tools" class="lab-tools">
+                <summary><span><strong>故障实验</strong><small>注入真实故障或模拟告警</small></span><span aria-hidden="true">＋</span></summary>
+                <div class="lab-tools-body">
+                  <div class="section-head"><h3 id="scenario-title">容器故障样本</h3><span class="small-muted">一次运行一个</span></div>
+                  <div id="scenarios" class="scenario-list"></div>
+                  <form id="lab-alert-form" class="lab-alert-form">
+                    <h3>自定义模拟告警</h3>
+                    <p class="helper">测试任意告警进入事故平台后的调查结果。不会制造服务故障。</p>
+                    <div class="alert-fields">
+                      <label>服务 <input name="service" required maxlength="80" pattern="[A-Za-z0-9._-]+" value="payment-service" /></label>
+                      <label>告警名 <input name="alert_name" required maxlength="80" pattern="[A-Za-z0-9._-]+" placeholder="QueueLagSpike" /></label>
+                      <label>资源标识 <input name="resource" maxlength="80" pattern="[A-Za-z0-9._-]+" placeholder="queue-orders" /></label>
+                      <label>信号类型 <input name="signal_type" maxlength="80" pattern="[A-Za-z0-9._-]+" placeholder="queue_lag" /></label>
+                      <label>严重程度 <select name="severity"><option value="warning">warning</option><option value="critical">critical</option></select></label>
+                    </div>
+                    <button id="lab-alert-button" class="secondary-button" type="submit">发送模拟告警</button>
+                    <span id="lab-alert-result" class="small-muted" role="status" aria-live="polite"></span>
+                  </form>
+                  <div class="run-box"><div class="section-head"><h3>运行记录</h3><span id="run-status" class="small-muted">尚未运行</span></div><pre id="run-output">启动一个场景后，执行结果会显示在这里。</pre></div>
+                </div>
+              </details>
+            </aside>
+            <section class="detail-panel" aria-labelledby="detail-title">
+              <div class="section-head detail-heading"><div><span class="detail-label">当前选中</span><h2 id="detail-title">事故调查</h2></div><span id="detail-meta" class="small-muted">正在读取事故</span></div>
+              <div id="incident-detail" class="detail-empty">正在选择最近事故…</div>
+            </section>
+          </div>
+        </section>
+      </main>
+      <footer>本机 Lab · 模拟付款 · 真实容器故障与遥测 · <a href="http://127.0.0.1:3000" target="_blank" rel="noreferrer">Grafana</a></footer>
+    </div>
+  </body>
+</html>

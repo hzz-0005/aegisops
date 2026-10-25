@@ -1,0 +1,50 @@
+schema_version = 2
+
+[[signals]]
+alert_name = "PaymentRedisUnavailable"
+service = "payment-service"
+hypothesis_key = "redis_unavailable"
+hypothesis_label = "支付缓存 Redis 不可用"
+metric_name = "lab_payment_redis_failures_total"
+log_phrase = "redis"
+trace_span = "redis.cache_read"
+
+[[signals]]
+alert_name = "OrderDbPoolExhausted"
+service = "order-service"
+hypothesis_key = "order_db_pool_exhaustion"
+hypothesis_label = "订单服务数据库连接池耗尽"
+metric_name = "lab_order_db_pool_lease_saturation_total"
+
+[[signals]]
+alert_name = "OrderBadDeployment"
+service = "order-service"
+hypothesis_key = "bad_order_deployment"
+hypothesis_label = "订单服务错误部署"
+metric_name = "lab_order_deployment_failures_total"
+metric_change_label = true
+requires_change = true
+
+[[signals]]
+alert_name = "OrderInventoryUnavailable"
+service = "order-service"
+hypothesis_key = "inventory_unavailable"
+hypothesis_label = "库存依赖不可用"
+metric_name = "lab_order_inventory_failures_total"
+
+[[signals]]
+alert_name = "GatewayOrderFailures"
+service = "lab-gateway"
+hypothesis_key = "gateway_order_failures"
+hypothesis_label = "网关观测到订单服务失败"
+metric_name = "lab_gateway_order_failures_total"
+metric_change_label = true
+root_candidate = false
+
+[[signals]]
+alert_name = "LabContainerOOMKill"
+service = "*"
+hypothesis_key = "container_oom_event"
+hypothesis_label = "容器内发生 OOM 进程终止"
+metric_name = "lab_container_oom_kills_total"
+root_candidate = false

@@ -1,0 +1,5 @@
+services:
+  worker:
+    restart: "no"
+    environment:
+      AEGISOPS_CRASH_AFTER_COMMIT_MESSAGE_ID: ${AEGISOPS_CRASH_AFTER_COMMIT_MESSAGE_ID}

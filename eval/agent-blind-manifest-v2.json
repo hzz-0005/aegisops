@@ -1,0 +1,316 @@
+{
+  "version": "agent-blind-manifest-v2",
+  "frozen_at": "2026-10-25",
+  "extends": "agent-blind-manifest-v1.json",
+  "protocol_note": "Same protocol as v1 (truth separated, neutral alert, post-hoc scoring, unknown never correct). v2 adds four unfamiliar mechanisms and requires >=2 repeats per case before aggregate claims; the harness prints one eval file per invocation and repeats are separate files.",
+  "protocol": {
+    "ground_truth_separation": "Truth below is read only by the harness that injects faults and scores reports afterwards; the agent receives a constant neutral alert (service, name, summary) and never sees this file, fault names, case ids or truth.",
+    "alert": {
+      "alert_name": "OperationalObservation",
+      "summary": "业务请求需要只读调查",
+      "header": "X-Aegisops-Console: lab-console-v1"
+    },
+    "scoring": {
+      "localisation_correct": "A backend-verified claim (OBSERVATION_VERIFIED) references the injected root service as claim.service or claim.dependency.",
+      "mechanism_exact": "A verified claim additionally matches one of the frozen mechanism_exact_claims; cases with an empty list can be localised but never mechanism-exact.",
+      "unknown_not_correct": "Reports without a verified claim score UNKNOWN, never correct.",
+      "wrong": "A verified claim that references neither the root service nor its failure interface scores WRONG.",
+      "control_false_positive": "The quiet control scores FALSE_POSITIVE if any claim is verified or confidence>0; a clean inconclusive finish scores CORRECT.",
+      "chance_baseline": "Chance@1 is mean(1/len(plausible_root_services)) over fault cases; Lift = exact_localisation_accuracy / Chance@1.",
+      "scope_limited": "Cases with scope_limited=true have a truth outside the read-only tool scope; expected honest outcome is UNKNOWN without a wrong claim."
+    }
+  },
+  "plausible_root_services_order_alert": [
+    "order-service",
+    "inventory-service",
+    "orders-postgres",
+    "payment-service",
+    "lab-gateway"
+  ],
+  "plausible_root_services_payment_alert": [
+    "payment-service",
+    "redis-main",
+    "orders-postgres",
+    "lab-gateway",
+    "order-service"
+  ],
+  "cases": [
+    {
+      "case_id": "ec9600c1-af74-5b82-b668-fa8e9527fc7b",
+      "carried_from": "v1",
+      "alert_service": "order-service",
+      "injection": {
+        "mode": "pause",
+        "target": "inventory-service"
+      },
+      "expected_symptom": {
+        "checkout_not_ok": true
+      },
+      "truth": {
+        "root_service": "inventory-service",
+        "mechanism": "process_paused",
+        "mechanism_exact_claims": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "inventory-service",
+            "state": "paused"
+          }
+        ],
+        "localisation_claim_families": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "inventory-service"
+          },
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "inventory-service"
+          }
+        ]
+      },
+      "plausible_root_services": [
+        "order-service",
+        "inventory-service",
+        "orders-postgres",
+        "payment-service",
+        "lab-gateway"
+      ],
+      "scope_limited": false
+    },
+    {
+      "case_id": "bb720e1f-2888-5512-8842-25d90d8b006e",
+      "carried_from": "v1",
+      "alert_service": "order-service",
+      "injection": {
+        "mode": "stop",
+        "target": "inventory-service"
+      },
+      "expected_symptom": {
+        "checkout_not_ok": true
+      },
+      "truth": {
+        "root_service": "inventory-service",
+        "mechanism": "process_exited",
+        "mechanism_exact_claims": [
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "inventory-service",
+            "failure_codes": [
+              "dependency_transport",
+              "dependency_timeout"
+            ]
+          },
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "inventory-service",
+            "state": "exited"
+          }
+        ],
+        "localisation_claim_families": [
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "inventory-service"
+          },
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "inventory-service"
+          }
+        ]
+      },
+      "plausible_root_services": [
+        "order-service",
+        "inventory-service",
+        "orders-postgres",
+        "payment-service",
+        "lab-gateway"
+      ],
+      "scope_limited": false
+    },
+    {
+      "case_id": "fb9dbba2-ad09-54c7-8bfb-677fc3bc8680",
+      "carried_from": "v1",
+      "alert_service": "order-service",
+      "injection": {
+        "mode": "pause",
+        "target": "lab-gateway"
+      },
+      "expected_symptom": {
+        "checkout_not_ok": true
+      },
+      "truth": {
+        "root_service": "lab-gateway",
+        "mechanism": "process_paused",
+        "mechanism_exact_claims": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "lab-gateway",
+            "state": "paused"
+          }
+        ],
+        "localisation_claim_families": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "lab-gateway"
+          },
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "lab-gateway"
+          }
+        ]
+      },
+      "plausible_root_services": [
+        "order-service",
+        "inventory-service",
+        "orders-postgres",
+        "payment-service",
+        "lab-gateway"
+      ],
+      "scope_limited": true,
+      "promotion": false,
+      "promotion_note": "Pausing the gateway breaks checkout at the transport layer before order-service can observe anything, so no request-failure signal can exist; the neutral alert enters its own incident (honest unknown path)."
+    },
+    {
+      "case_id": "b4064db5-a2b0-567d-b1b0-34f64506b41e",
+      "carried_from": "v1",
+      "alert_service": null,
+      "injection": null,
+      "expected_symptom": null,
+      "truth": null,
+      "plausible_root_services": [],
+      "scope_limited": false
+    },
+    {
+      "case_id": "afd096bf-2ba0-5a7a-a252-e972ceb830ae",
+      "alert_service": "order-service",
+      "injection": {
+        "mode": "pause",
+        "target": "payment-service"
+      },
+      "expected_symptom": {
+        "checkout_not_ok": true
+      },
+      "truth": {
+        "root_service": "payment-service",
+        "mechanism": "process_paused",
+        "mechanism_exact_claims": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "payment-service",
+            "state": "paused"
+          }
+        ],
+        "localisation_claim_families": [
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "payment-service"
+          },
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "payment-service"
+          }
+        ]
+      },
+      "plausible_root_services": [
+        "order-service",
+        "inventory-service",
+        "orders-postgres",
+        "payment-service",
+        "lab-gateway"
+      ],
+      "scope_limited": false
+    },
+    {
+      "case_id": "cf598aff-fe0d-5e1d-a037-bfb55722b922",
+      "alert_service": "order-service",
+      "injection": {
+        "mode": "stop",
+        "target": "payment-service"
+      },
+      "expected_symptom": {
+        "checkout_not_ok": true
+      },
+      "truth": {
+        "root_service": "payment-service",
+        "mechanism": "process_exited",
+        "mechanism_exact_claims": [
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "payment-service",
+            "failure_codes": [
+              "dependency_transport",
+              "dependency_timeout"
+            ]
+          },
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "payment-service",
+            "state": "exited"
+          }
+        ],
+        "localisation_claim_families": [
+          {
+            "kind": "REQUEST_FAILURE",
+            "service": "order-service",
+            "dependency": "payment-service"
+          },
+          {
+            "kind": "RUNTIME_STATE",
+            "service": "payment-service"
+          }
+        ]
+      },
+      "plausible_root_services": [
+        "order-service",
+        "inventory-service",
+        "orders-postgres",
+        "payment-service",
+        "lab-gateway"
+      ],
+      "scope_limited": false
+    },
+    {
+      "case_id": "a96e37eb-783c-5e1a-aad5-3bb49fac6066",
+      "alert_service": "payment-service",
+      "injection": {
+        "mode": "provider-delay",
+        "target": "payment-service",
+        "seconds": 8
+      },
+      "promotion": false,
+      "expected_symptom": null,
+      "truth": {
+        "root_service": "external-payment-provider",
+        "mechanism": "provider_latency",
+        "mechanism_exact_claims": [],
+        "localisation_claim_families": []
+      },
+      "plausible_root_services": [
+        "payment-service",
+        "redis-main",
+        "orders-postgres",
+        "lab-gateway",
+        "order-service"
+      ],
+      "scope_limited": true
+    }
+  ],
+  "excluded_cases": [
+    {
+      "case_id": "599efe46-c890-5563-90b2-2fce25c30b33",
+      "reason": "cpu-pressure at 0.05 CPU did not fail checkout on this host (200 in ~1.1s): the fault produces no request-failure symptoms, so no signal can materialize. Requires a Prometheus-alert-based entry path instead; excluded from the v2 runnable set on 2026-10-25 after a manual reproduction."
+    }
+  ],
+  "case_revisions": [
+    {
+      "at": "2026-10-25",
+      "case_id": "fb9dbba2-ad09-54c7-8bfb-677fc3bc8680",
+      "change": "promotion true -> false",
+      "reason": "gateway pause produces transport-level checkout failure; no signal path"
+    }
+  ]
+}

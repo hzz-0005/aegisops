@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.py[cod]
+.env
+*.egg-info/
+dist/
+
+.tmp/
+
+# Runtime evidence JSON blobs: keep frozen manifests, summaries and the README in
+# git; per-run artifacts (incident UUIDs, trace ids, container names) stay local.
+eval/*
+!eval/README.md
+!eval/agent-blind-manifest-v1.json
+!eval/agent-blind-manifest-v2.json
+!eval/request-shadow-manifest-v1.json
+!eval/inventory-variants-manifest-v1.json
+!eval/investigation_cases.json
+!eval/model-providers.md
+!eval/agent-blind-summary-*.json
+to-delete/

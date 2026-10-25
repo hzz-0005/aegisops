@@ -1,0 +1,36 @@
+{
+  "assertions": [
+    {
+      "name": "sku-demo-currency",
+      "service": "inventory-service",
+      "url": "http://inventory-service:8000/inventory/sku-demo",
+      "field": "currency",
+      "equals": "CNY",
+      "checkout_sku": "sku-demo"
+    },
+    {
+      "name": "sku-headphones-currency",
+      "service": "inventory-service",
+      "url": "http://inventory-service:8000/inventory/sku-headphones",
+      "field": "currency",
+      "equals": "CNY",
+      "checkout_sku": "sku-headphones"
+    },
+    {
+      "name": "sku-keyboard-currency",
+      "service": "inventory-service",
+      "url": "http://inventory-service:8000/inventory/sku-keyboard",
+      "field": "currency",
+      "equals": "CNY",
+      "checkout_sku": "sku-keyboard"
+    },
+    {
+      "name": "sku-lamp-currency",
+      "service": "inventory-service",
+      "url": "http://inventory-service:8000/inventory/sku-lamp",
+      "field": "currency",
+      "equals": "CNY",
+      "checkout_sku": "sku-lamp"
+    }
+  ]
+}

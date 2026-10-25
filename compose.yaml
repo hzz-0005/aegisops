@@ -1,0 +1,402 @@
+services:
+  postgres:
+    container_name: aegisops-postgres
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aegisops
+      POSTGRES_USER: aegisops
+      POSTGRES_PASSWORD: aegisops_dev_only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisops -d aegisops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  lab-orders-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lab_orders
+      POSTGRES_USER: lab_orders
+      POSTGRES_PASSWORD: lab_orders_dev_only
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - lab_orders_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab_orders -d lab_orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  lab-migrate:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["python", "-m", "lab.db.migrate"]
+    environment:
+      LAB_DATABASE_URL: postgresql://lab_orders:lab_orders_dev_only@lab-orders-postgres:5432/lab_orders
+    depends_on:
+      lab-orders-postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_OTEL_ENABLED: "true"
+      AEGISOPS_ALERT_WEBHOOK_TOKEN: aegisops_dev_only
+      AEGISOPS_REQUEST_EVENT_SERVICE_TOKENS: '{"order-service":"aegisops_order_request_dev_only","lab-gateway":"aegisops_gateway_request_dev_only","inventory-service":"aegisops_inventory_request_dev_only","payment-service":"aegisops_payment_request_dev_only"}'
+      AEGISOPS_TEMPO_URL: http://tempo:3200
+      AEGISOPS_OPERATOR_TOKEN: aegisops_operator_dev_only
+      AEGISOPS_APPROVER_TOKEN: aegisops_approver_dev_only
+      AEGISOPS_TEMPORAL_ADDRESS: temporal:7233
+      AEGISOPS_OPA_URL: http://opa:8181
+      AEGISOPS_REMEDIATION_KILL_SWITCH: "false"
+      AEGISOPS_LAB_PAYMENT_URL: http://payment-service:8000
+      AEGISOPS_LAB_ORDER_URL: http://order-service:8000
+      AEGISOPS_LLM_BASE_URL: ${AEGISOPS_LLM_BASE_URL:-}
+      AEGISOPS_LLM_MODEL: ${AEGISOPS_LLM_MODEL:-}
+      AEGISOPS_LLM_API_KEY: ${AEGISOPS_LLM_API_KEY:-}
+      AEGISOPS_LLM_MAX_TOKENS_PARAMETER: ${AEGISOPS_LLM_MAX_TOKENS_PARAMETER:-max_tokens}
+      AEGISOPS_LLM_RESPONSE_FORMAT: ${AEGISOPS_LLM_RESPONSE_FORMAT:-json_object}
+      AEGISOPS_LLM_THINKING_MODE: ${AEGISOPS_LLM_THINKING_MODE:-default}
+      AEGISOPS_LLM_MAX_OUTPUT_TOKENS: ${AEGISOPS_LLM_MAX_OUTPUT_TOKENS:-500}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    build: .
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  opa:
+    image: openpolicyagent/opa:1.21.0
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policy/remediation.rego"]
+    volumes:
+      - ./infra/opa:/policy:ro
+    ports:
+      - "127.0.0.1:8181:8181"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: aegisops
+      RABBITMQ_DEFAULT_PASS: aegisops_dev_only
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    build: .
+    command: ["python", "-m", "apps.worker.main"]
+    restart: unless-stopped
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_RABBITMQ_URL: amqp://aegisops:aegisops_dev_only@rabbitmq:5672/
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  request-signal-detector:
+    build: .
+    command: ["python", "-m", "apps.request_signal_detector.main"]
+    restart: unless-stopped
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_TEMPO_URL: http://tempo:3200
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      tempo:
+        condition: service_started
+
+  temporal-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal_dev_only
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:1.27.2
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal_dev_only
+      POSTGRES_SEEDS: temporal-postgres
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "127.0.0.1:7233:7233"
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+
+  workflow-worker:
+    build: .
+    command: ["python", "-m", "apps.workflow_worker.main"]
+    restart: unless-stopped
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_TEMPORAL_ADDRESS: temporal:7233
+      AEGISOPS_PROMETHEUS_URL: http://prometheus:9090
+      AEGISOPS_LOKI_URL: http://loki:3100
+      AEGISOPS_TEMPO_URL: http://tempo:3200
+      AEGISOPS_LAB_PAYMENT_URL: http://payment-service:8000
+      AEGISOPS_LAB_ORDER_URL: http://order-service:8000
+      AEGISOPS_INVESTIGATION_AGENT_ENABLED: ${AEGISOPS_INVESTIGATION_AGENT_ENABLED:-true}
+      AEGISOPS_INVESTIGATION_AGENT_SECONDS: ${AEGISOPS_INVESTIGATION_AGENT_SECONDS:-90}
+      AEGISOPS_INVESTIGATION_AGENT_MODEL_CALLS: ${AEGISOPS_INVESTIGATION_AGENT_MODEL_CALLS:-4}
+      AEGISOPS_INVESTIGATION_AGENT_TOOL_CALLS: ${AEGISOPS_INVESTIGATION_AGENT_TOOL_CALLS:-8}
+      AEGISOPS_LLM_BASE_URL: ${AEGISOPS_LLM_BASE_URL:-}
+      AEGISOPS_LLM_MODEL: ${AEGISOPS_LLM_MODEL:-}
+      AEGISOPS_LLM_API_KEY: ${AEGISOPS_LLM_API_KEY:-}
+      AEGISOPS_LLM_MAX_TOKENS_PARAMETER: ${AEGISOPS_LLM_MAX_TOKENS_PARAMETER:-max_tokens}
+      AEGISOPS_LLM_RESPONSE_FORMAT: ${AEGISOPS_LLM_RESPONSE_FORMAT:-json_object}
+      AEGISOPS_LLM_THINKING_MODE: ${AEGISOPS_LLM_THINKING_MODE:-default}
+      AEGISOPS_LLM_MAX_OUTPUT_TOKENS: ${AEGISOPS_LLM_MAX_OUTPUT_TOKENS:-500}
+      AEGISOPS_LLM_TIMEOUT_SECONDS: ${AEGISOPS_LLM_TIMEOUT_SECONDS:-20}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+
+  workflow-starter:
+    build: .
+    command: ["python", "-m", "apps.workflow_starter.main"]
+    restart: unless-stopped
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_RABBITMQ_URL: amqp://aegisops:aegisops_dev_only@rabbitmq:5672/
+      AEGISOPS_TEMPORAL_ADDRESS: temporal:7233
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  lab-executor:
+    build: .
+    command: ["python", "-m", "apps.lab_executor.main"]
+    restart: unless-stopped
+    environment:
+      AEGISOPS_PROFILE: dev
+      AEGISOPS_DATABASE_URL: postgresql+psycopg://aegisops:aegisops_dev_only@postgres:5432/aegisops
+      AEGISOPS_OPA_URL: http://opa:8181
+      AEGISOPS_REMEDIATION_KILL_SWITCH: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      opa:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["uvicorn", "lab.services.inventory:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      LAB_DATABASE_URL: postgresql://lab_orders:lab_orders_dev_only@lab-orders-postgres:5432/lab_orders
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      LAB_REQUEST_EVENT_URL: http://api:8000/api/v1/request-events
+      LAB_REQUEST_EVENT_TOKEN: aegisops_inventory_request_dev_only
+      LAB_DB_READ_LOCK_TIMEOUT_MS: "1000"
+      LAB_DB_READ_STATEMENT_TIMEOUT_MS: "2000"
+    ports:
+      - "127.0.0.1:8004:8000"
+    depends_on:
+      lab-migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["uvicorn", "lab.services.payment:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      LAB_DATABASE_URL: postgresql://lab_orders:lab_orders_dev_only@lab-orders-postgres:5432/lab_orders
+      LAB_PAYMENT_PROVIDER: simulated
+      LAB_FAULT_TOKEN: aegisops_lab_fault_dev_only
+      LAB_REDIS_URL: redis://redis:6379/0
+      LAB_REQUEST_EVENT_URL: http://api:8000/api/v1/request-events
+      LAB_REQUEST_EVENT_TOKEN: aegisops_payment_request_dev_only
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8002:8000"
+    depends_on:
+      lab-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  order-service:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["uvicorn", "lab.services.order:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      LAB_DATABASE_URL: postgresql://lab_orders:lab_orders_dev_only@lab-orders-postgres:5432/lab_orders
+      LAB_INVENTORY_URL: http://inventory-service:8000
+      LAB_PAYMENT_URL: http://payment-service:8000
+      LAB_BUSINESS_CONTRACTS_FILE: /app/lab/config/business_contracts.json
+      LAB_DB_POOL_MAX_SIZE: "2"
+      LAB_DB_POOL_TIMEOUT_SECONDS: "0.5"
+      LAB_FAULT_TOKEN: aegisops_lab_fault_dev_only
+      LAB_REQUEST_EVENT_URL: http://api:8000/api/v1/request-events
+      LAB_REQUEST_EVENT_TOKEN: aegisops_order_request_dev_only
+      LAB_BAD_DEPLOYMENT: "false"
+      LAB_DEPLOYMENT_CHANGE_ID: baseline
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8003:8000"
+    depends_on:
+      inventory-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+
+  lab-gateway:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["uvicorn", "lab.services.gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      LAB_ORDER_URL: http://order-service:8000
+      LAB_REQUEST_EVENT_URL: http://api:8000/api/v1/request-events
+      LAB_REQUEST_EVENT_TOKEN: aegisops_gateway_request_dev_only
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      order-service:
+        condition: service_started
+
+  lab-health-probe:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile
+    image: aegisops-lab:dev
+    command: ["uvicorn", "lab.services.health_probe:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      LAB_PROBE_TARGETS: '{"lab-gateway":"http://lab-gateway:8000/health/live","order-service":"http://order-service:8000/health/live","payment-service":"http://payment-service:8000/health/live","inventory-service":"http://inventory-service:8000/health/live"}'
+      LAB_BUSINESS_CONTRACTS_FILE: /app/lab/config/business_contracts.json
+    depends_on:
+      - lab-gateway
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./infra/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - loki
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.3.0
+    command: ["--config.file=/etc/prometheus/prometheus.yaml"]
+    volumes:
+      - ./infra/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./infra/prometheus/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - otel-collector
+      - lab-health-probe
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yaml"]
+    volumes:
+      - ./infra/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    depends_on:
+      - api
+
+  loki:
+    image: grafana/loki:3.4.2
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./infra/loki/loki.yaml:/etc/loki/loki.yaml:ro
+    ports:
+      - "127.0.0.1:3100:3100"
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./infra/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+    ports:
+      - "127.0.0.1:3200:3200"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: aegisops_dev_only
+    volumes:
+      - ./infra/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+volumes:
+  postgres_data:
+  lab_orders_postgres_data:
+  temporal_postgres_data:

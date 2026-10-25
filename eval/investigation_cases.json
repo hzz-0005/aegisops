@@ -1,0 +1,286 @@
+{
+  "cases": [
+    {
+      "expected_hypothesis": "redis_unavailable",
+      "input": {
+        "evidence": [
+          {
+            "id": "13972044-b7dc-4912-a5f1-02616c741114",
+            "kind": "NORMALIZED_ALERT",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "alert_name": "PaymentRedisUnavailable",
+              "service": "payment-service",
+              "status": "FIRING"
+            },
+            "source_type": "ALERT",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "205f2f05-c909-48e1-a6c7-e02c5a562a2b",
+            "kind": "COUNTER_INCREASE",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "peak_increase": 1.4453
+            },
+            "source_type": "METRIC",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "7d823f25-9d2b-4ae3-9523-438ca37ca68a",
+            "kind": "ERROR_LOG",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "LOG",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "a61588d1-758a-4077-9ccc-8161b8285f09",
+            "kind": "SERVICE_DEPENDENCIES",
+            "polarity": "CONTEXT",
+            "safe_facts": {},
+            "source_type": "CATALOG",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "b20f449f-8a9b-423a-ac9c-f0660699c9d5",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "fc66ca49-26f1-4395-a041-affb1b4e8d46",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "redis_unavailable"
+          },
+          {
+            "id": "fc90d95a-36aa-4e9b-abaf-25d4e7e7e263",
+            "kind": "ERROR_LOG",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "LOG",
+            "subject": "redis_unavailable"
+          }
+        ],
+        "hypotheses": [
+          {
+            "key": "redis_unavailable",
+            "rationale": "Supporting sources: ALERT, LOG, METRIC, TRACE; conflicting sources: none.",
+            "score": 0.9
+          }
+        ],
+        "limitations": [],
+        "primary_hypothesis": "redis_unavailable",
+        "report_id": "c90daf53-b022-4859-8dab-ee453600aa37",
+        "status": "SUPPORTED"
+      },
+      "report_stale_after_resolution": false,
+      "report_status": "SUPPORTED",
+      "reported_hypothesis": "redis_unavailable",
+      "scenario": "PaymentRedisUnavailable",
+      "source_report_id": "c90daf53-b022-4859-8dab-ee453600aa37"
+    },
+    {
+      "expected_hypothesis": "order_db_pool_exhaustion",
+      "input": {
+        "evidence": [
+          {
+            "id": "235492d8-a895-4d9d-b150-1520977a176e",
+            "kind": "COUNTER_INCREASE",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "peak_increase": 2.5
+            },
+            "source_type": "METRIC",
+            "subject": "order_db_pool_exhaustion"
+          },
+          {
+            "id": "41d8900c-4a02-474b-978c-baeb581f3a37",
+            "kind": "NORMALIZED_ALERT",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "alert_name": "OrderDbPoolExhausted",
+              "service": "order-service",
+              "status": "FIRING"
+            },
+            "source_type": "ALERT",
+            "subject": "order_db_pool_exhaustion"
+          },
+          {
+            "id": "43a651e4-1108-4145-a732-e93e58d00c18",
+            "kind": "SERVICE_DEPENDENCIES",
+            "polarity": "CONTEXT",
+            "safe_facts": {},
+            "source_type": "CATALOG",
+            "subject": "order_db_pool_exhaustion"
+          }
+        ],
+        "hypotheses": [
+          {
+            "key": "order_db_pool_exhaustion",
+            "rationale": "Supporting sources: ALERT, METRIC; conflicting sources: none.",
+            "score": 0.6
+          }
+        ],
+        "limitations": [],
+        "primary_hypothesis": "order_db_pool_exhaustion",
+        "report_id": "2450687d-18fd-4abf-b87f-38bb98c546eb",
+        "status": "SUPPORTED"
+      },
+      "report_stale_after_resolution": true,
+      "report_status": "SUPPORTED",
+      "reported_hypothesis": "order_db_pool_exhaustion",
+      "scenario": "OrderDbPoolExhausted",
+      "source_report_id": "2450687d-18fd-4abf-b87f-38bb98c546eb"
+    },
+    {
+      "expected_hypothesis": "bad_order_deployment",
+      "input": {
+        "evidence": [
+          {
+            "id": "23ea744b-8cfd-43c2-ac48-7b34c11ed7e9",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "301e0503-6d5e-4895-8a8d-fd4858ac8f19",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "6b0c7558-1ef1-4d71-bfe1-308d985acf94",
+            "kind": "DEPLOYMENT_CHANGE",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "change_type": "DEPLOYMENT",
+              "from_ref": "baseline",
+              "to_ref": "lab-order-bad-6aeb6be0b061"
+            },
+            "source_type": "CHANGE",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "6e0067bb-a248-47ef-a300-0f7d654d59f9",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "7d786422-be65-4f3a-b7d7-dd3da74ec748",
+            "kind": "COUNTER_INCREASE",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "peak_increase": 4.178
+            },
+            "source_type": "METRIC",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "8b849885-3a45-40d2-aec8-572985c1c7ff",
+            "kind": "NORMALIZED_ALERT",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "alert_name": "OrderBadDeployment",
+              "service": "order-service",
+              "status": "FIRING"
+            },
+            "source_type": "ALERT",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "8dab32d4-4f12-47d6-9dc4-a0b499d410ee",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "96c79360-459f-48ca-9b7e-7b2131b71818",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "bad_order_deployment"
+          },
+          {
+            "id": "b167715d-a2b6-496e-9166-b220cdcc53c2",
+            "kind": "SERVICE_DEPENDENCIES",
+            "polarity": "CONTEXT",
+            "safe_facts": {},
+            "source_type": "CATALOG",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "c3a5d1db-6d8a-460d-9932-ff7ee698de91",
+            "kind": "COUNTER_INCREASE",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "peak_increase": 4.178
+            },
+            "source_type": "METRIC",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "d4c1f04c-3e71-4c53-8ce0-7bb98e6b939b",
+            "kind": "NORMALIZED_ALERT",
+            "polarity": "SUPPORT",
+            "safe_facts": {
+              "alert_name": "GatewayOrderFailures",
+              "service": "lab-gateway",
+              "status": "FIRING"
+            },
+            "source_type": "ALERT",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "d77ac112-0ca6-4b2c-b432-1d5a3a8ffc8d",
+            "kind": "ERROR_SPAN",
+            "polarity": "SUPPORT",
+            "safe_facts": {},
+            "source_type": "TRACE",
+            "subject": "gateway_order_failures"
+          },
+          {
+            "id": "ed52acbf-3930-422b-9c05-95ded77fe1f3",
+            "kind": "SERVICE_DEPENDENCIES",
+            "polarity": "CONTEXT",
+            "safe_facts": {},
+            "source_type": "CATALOG",
+            "subject": "bad_order_deployment"
+          }
+        ],
+        "hypotheses": [
+          {
+            "key": "bad_order_deployment",
+            "rationale": "Supporting sources: ALERT, CHANGE, METRIC, TRACE; conflicting sources: none.",
+            "score": 1.0
+          }
+        ],
+        "limitations": [],
+        "primary_hypothesis": "bad_order_deployment",
+        "report_id": "f315f89b-bf63-41ce-a342-90ab457251f7",
+        "status": "SUPPORTED"
+      },
+      "report_stale_after_resolution": true,
+      "report_status": "SUPPORTED",
+      "reported_hypothesis": "bad_order_deployment",
+      "scenario": "OrderBadDeployment",
+      "source_report_id": "f315f89b-bf63-41ce-a342-90ab457251f7"
+    }
+  ],
+  "schema_version": 1
+}

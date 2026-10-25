@@ -1,0 +1,29 @@
+version = "remediation-catalog-v2-zh"
+
+[[actions]]
+hypothesis_key = "redis_unavailable"
+action_type = "restart_cache"
+target_kind = "resource"
+target_slug = "redis-main"
+risk = "HIGH"
+rationale = "先确认 Redis 进程不可用，再重启支付缓存。"
+blast_radius = "支付缓存连接和正在处理的结账请求。"
+
+[[actions]]
+hypothesis_key = "order_db_pool_exhaustion"
+action_type = "restart_service"
+target_kind = "service"
+target_slug = "order-service"
+risk = "HIGH"
+rationale = "先核实连接池确已耗尽；重启订单服务可能释放被占用的连接。"
+blast_radius = "重启期间的订单结账请求。"
+
+[[actions]]
+hypothesis_key = "bad_order_deployment"
+action_type = "rollback_service"
+target_kind = "service"
+target_slug = "order-service"
+risk = "HIGH"
+rationale = "运维人员核对发布指纹和影响范围后，回退订单服务到已记录的上一版本。"
+blast_radius = "订单结账请求和订单服务的发布状态。"
+parameter_from_change = "from_ref"

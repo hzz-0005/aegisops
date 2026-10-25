@@ -1,0 +1,5 @@
+services:
+  order-service:
+    environment:
+      LAB_BAD_DEPLOYMENT: "true"
+      LAB_DEPLOYMENT_CHANGE_ID: ${LAB_DEPLOYMENT_CHANGE_ID}

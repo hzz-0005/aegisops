@@ -1,0 +1,17 @@
+{
+  "evaluation_scope": "historical_request_propagation_replay_not_new_blind_test",
+  "cases": [
+    {
+      "case_id": "same_gateway_symptom_two_known_roots",
+      "membership_report": "eval/source-membership-20261008T110558Z.json",
+      "proof_report": "eval/request-links-audit-20261008T101758Z.json",
+      "oracle_report": "eval/signal-collision-20261008T101503Z.json",
+      "oracle_basis": "client-selected serial checkout traces and independent injected roots; oracle facts must match persisted events"
+    },
+    {
+      "case_id": "inventory_exit_and_database_lock_windows",
+      "candidate_report": "eval/request-candidates-20261011T111309Z.json",
+      "oracle_basis": "no independent per-request root oracle; report only propagation evidence and coverage"
+    }
+  ]
+}

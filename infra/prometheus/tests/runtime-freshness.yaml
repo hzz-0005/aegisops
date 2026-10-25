@@ -1,0 +1,34 @@
+rule_files: []
+evaluation_interval: 5s
+tests:
+  - name: stale-container-state-is-not-current-evidence
+    interval: 5s
+    input_series:
+      - series: 'lab_runtime_state{service="payment-service",state="paused"}'
+        values: '1+0x8'
+      - series: 'lab_runtime_observed{service="payment-service"}'
+        values: '1+0x8'
+      - series: 'lab_runtime_observed_at_seconds{service="payment-service"}'
+        values: '20+0x8'
+    promql_expr_test:
+      - expr: 'lab_runtime_state == 1 and on(service) (lab_runtime_observed == 1) and on(service) (time() - lab_runtime_observed_at_seconds >= 0) and on(service) (time() - lab_runtime_observed_at_seconds < 15)'
+        eval_time: 40s
+        exp_samples: []
+      - expr: 'lab_runtime_state == 1 and on(service) (lab_runtime_observed == 1) and on(service) (time() - lab_runtime_observed_at_seconds >= 0) and on(service) (time() - lab_runtime_observed_at_seconds < 15)'
+        eval_time: 25s
+        exp_samples:
+          - labels: 'lab_runtime_state{service="payment-service",state="paused"}'
+            value: 1
+  - name: failed-inspection-does-not-reuse-old-state
+    interval: 5s
+    input_series:
+      - series: 'lab_runtime_state{service="payment-service",state="paused"}'
+        values: '1+0x8'
+      - series: 'lab_runtime_observed{service="payment-service"}'
+        values: '0+0x8'
+      - series: 'lab_runtime_observed_at_seconds{service="payment-service"}'
+        values: '20+0x8'
+    promql_expr_test:
+      - expr: 'lab_runtime_state == 1 and on(service) (lab_runtime_observed == 1) and on(service) (time() - lab_runtime_observed_at_seconds >= 0) and on(service) (time() - lab_runtime_observed_at_seconds < 15)'
+        eval_time: 25s
+        exp_samples: []
