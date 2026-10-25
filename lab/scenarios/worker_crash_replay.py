@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
+
 from lab.scenarios.delivery_reliability import await_processed, facts, send_alert, verify_counts
 
 ROOT = Path(__file__).resolve().parents[2]
