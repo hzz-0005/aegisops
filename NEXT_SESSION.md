@@ -1,5 +1,33 @@
 # 接续标记 · 2026-10-11
 
+## 2026-10-25 接续点：重试机制实测全链通过（RESOLVED v5）+ 英文 README + 双分支策略落定
+
+先读上一条。
+
+**Agent 重试机制已部署并实测通过**：`RETRYABLE_DECISION_ERRORS = {INVALID_MODEL_DECISION, FINAL_SUMMARY_REQUIRED}`——畸形/不合规的模型输出在**同一调用预算内**重试（校验规则零放宽；传输/配置类失败绝不重试）。run 3（`eval/agent-remediation-20261025T142317Z.json`）实测：4 次模型调用（含重试）→ MODEL_FINISHED → 门禁过 → 提议 201 → OPA → 审批 → 执行 SUCCEEDED → 告警解除 → recovery_ready=true → RESOLVE → **事故 RESOLVED v5**，时间线完整（POLICY→APPROVAL→EXECUTION→ALERT_RESOLVED→RECOVERY_VERIFIED→RESOLVED）。eval 的 passed:false 只是脚本末轮 120s 轮询短于工作流结案耗时——DB 时间线为准。回归测试 4 项（重试/预算耗尽停/传输不重试/末轮违规重试后完成），356 项全绿。
+
+**英文 README.en.md** 已建并与中文互链（含重试语义、demo、边界）。
+
+**双分支策略落定**：`main` = 公开干净线（孤儿分支，295 文件）；误推的远端 master（含完整研发历史）已删除（API 204），本地 master 保留全部历史。后续同步：master 提交 → `git checkout main && git restore --source=master --staged --worktree . && git commit && git push`。
+
+**（下批候选）** ①重复批次测方差；②demo 脚本末轮轮询延长到 240s；③GitHub Pages/文档站。
+
+**边界**：重试只对格式类错误，fail-closed 原则不变；eval 里 passed:false 的文件保留为诚实证据（DB 时间线佐证实际通过）。
+
+## 2026-10-25 接续点：仓库已公开发布 GitHub（CI 全绿）+ to-delete 清扫完成
+
+先读上一条（GitHub 就绪改造 + demo 方差）。
+
+**仓库已上线：<https://github.com/hzz-0005/aegisops>（public，Apache-2.0）。** 发布方式：master 保留完整本地研发历史（含旧 eval 数据），`main` 为干净孤儿分支（295 文件：当前树、无 .env/.tmp/to-delete/运行时 JSON，无任何密钥——推送前 grep 审计过）。凭据来自 Windows 凭据管理器的 GitHub token（hzz-0005），无需交互登录。
+
+**CI 已全绿**（4 job：lint/unit/policy/compose）。排障过程中修了三个真实问题：① CI 裸 `pytest` 不加仓库根到 sys.path → `python -m pytest`；② ruff 版本浮动（CI 装到 0.20+）→ CI 固定 `ruff==0.17.2`（新版本会新增规则，锁定是正确的工程做法）；③ **moving delivery_reliability.py 翻转了 ruff 对 `lab.scenarios` 导入的 first-party 分类**（I001）——根因是清扫时引用检查漏了 lab/ 目录；已恢复该文件（worker_crash_replay 导入它）。教训：**移动任何被导入的模块前，grep 范围必须含全部包目录**。
+
+**to-delete 清扫完成**：10 篇旧批次文档 + 25 张旧截图 + 3 个早期场景脚本已归档（保留 7 篇活跃/契约文档 + 8 张当前截图）；352 测试验证无破坏。文件夹已加 .gitignore（本地等用户删除）。注意：第一波归档的文件用户已自行删除；delivery_reliability 已恢复不删。
+
+**（下批候选）** ①重复批次测方差（~2h 模型时间）；②INVALID_MODEL_DECISION 单次容忍重试的权衡；③英文 README（README.en.md 占位）；④GitHub Pages/文档站可选。
+
+**边界**：main 与 master 双分支是刻意的（main=公开干净线，master=研发全历史）；后续同步用 `git checkout main && git restore --source=master --staged --worktree .` 再提交；to-delete 里的 delivery_reliability 引用教训适用于未来任何文件移动。
+
 ## 2026-10-25 接续点：GitHub就绪改造完成 + demo验证与模型方差数据
 
 先读本条与 docs/agent-remediation-loop-2026-10-25.md。

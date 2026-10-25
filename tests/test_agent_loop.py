@@ -180,9 +180,13 @@ def test_alert_from_another_incident_rejected():
 def test_forged_reference_stops_before_tool():
     loop, state = make_loop(lambda _: AgentDecision(
         decision="FINISH", reason="错误引用", summary="错误引用", cited_evidence_ids=[uuid4()]))
-    state.update(loop.plan(state))
-    assert state["agent_done"] and loop.trace.stop_reason == "INVALID_MODEL_DECISION"
-    assert loop.trace.tool_calls == 0
+    # Every attempt is rejected; retries stay inside the call budget and the
+    # forged citation never reaches a tool or the evidence list.
+    while not state.get("agent_done"):
+        state.update(loop.plan(state))
+    assert loop.trace.stop_reason == "INVALID_MODEL_DECISION"
+    assert loop.trace.tool_calls == 0 and loop.trace.model_calls == 4
+    assert all(s.status == "REJECTED" for s in loop.trace.steps)
 
 
 def test_repeated_query_does_not_repeat_external_call():
@@ -220,8 +224,11 @@ def test_model_failure_is_bounded_and_redacted(error, reason):
     def fail(_):
         raise error
     loop, state = make_loop(fail)
-    state.update(loop.plan(state))
-    assert loop.trace.stop_reason == reason and loop.trace.model_calls == 1
+    while not state.get("agent_done"):
+        state.update(loop.plan(state))
+    assert loop.trace.stop_reason == reason
+    # Transport failures stop immediately; invalid decisions retry within budget.
+    assert loop.trace.model_calls == (1 if reason == "MODEL_UNAVAILABLE" else 4)
     assert "secret" not in loop.trace.model_dump_json()
 
 
@@ -434,3 +441,78 @@ def test_finish_collects_membership_coverage_when_model_skipped_it():
     assert not any(s.decision is not None and "membership" in json.dumps(
         s.input_summary.get("evidence", [])) for s in loop.trace.steps
         if s.phase == "MODEL")
+
+
+def test_invalid_decision_is_retried_within_budget_not_fatal():
+    calls = []
+
+    def choose(payload):
+        calls.append(payload)
+        if len(calls) == 1:
+            raise ValueError("malformed planner output")
+        return tool_decision(payload)
+
+    loop, state = make_loop(choose)
+    first = loop.plan(state)
+    assert first == {"agent_done": False, "agent_retry": True}
+    assert loop.trace.stop_reason is None and loop.trace.model_calls == 1
+    state.update(first)
+    state.update(loop.plan(state))
+    assert not state.get("agent_retry")
+    assert loop.trace.steps[0].status == "REJECTED"
+    assert loop.trace.steps[0].error_code == "INVALID_MODEL_DECISION"
+    assert loop.trace.steps[1].status == "COMPLETED"
+    assert loop.trace.model_calls == 2 and loop.trace.stop_reason is None
+
+
+def test_invalid_decisions_stop_when_budget_is_exhausted():
+    def always_invalid(_payload):
+        raise ValueError("malformed planner output")
+
+    loop, state = make_loop(always_invalid)
+    for _ in range(6):
+        result = loop.plan(state)
+        state.update(result)
+        if result["agent_done"]:
+            break
+    assert loop.trace.model_calls == 4
+    assert loop.trace.stop_reason in {"MODEL_BUDGET", "INVALID_MODEL_DECISION"}
+    assert all(s.status == "REJECTED" for s in loop.trace.steps)
+
+
+def test_transport_failure_is_never_retried():
+    def unreachable(_payload):
+        raise httpx.ConnectError("endpoint unreachable")
+
+    loop, state = make_loop(unreachable)
+    result = loop.plan(state)
+    assert result == {"agent_done": True, "agent_retry": False}
+    assert loop.trace.stop_reason == "MODEL_UNAVAILABLE"
+    assert loop.trace.model_calls == 1
+
+
+def test_final_summary_violation_retries_then_finishes():
+    # The tool budget flips the mode to FINAL_SUMMARY while model budget
+    # remains; a tool request there is rejected once, then retried.
+    calls = []
+
+    def choose(payload):
+        calls.append(payload)
+        if payload["mode"] != "FINAL_SUMMARY":
+            return tool_decision(payload)
+        if len(calls) == 2:
+            return tool_decision(payload)  # forbidden in the summary round
+        return AgentDecision(decision="FINISH", reason="按规则总结",
+                             summary="依据实际观测结束。")
+
+    loop, state = make_loop(choose, investigation_agent_tool_calls=1)
+    state.update(loop.plan(state))    # call 1: TOOL (investigate mode)
+    state.update(loop.observe(state))  # tool budget now exhausted
+    second = loop.plan(state)          # call 2: FINAL mode, TOOL -> rejected
+    assert second == {"agent_done": False, "agent_retry": True}
+    state.update(second)
+    state.update(loop.plan(state))     # call 3: FINAL mode, FINISH
+    assert loop.trace.stop_reason == "MODEL_FINISHED"
+    assert loop.trace.model_calls == 3 and loop.trace.tool_calls == 1
+    assert loop.trace.steps[2].error_code == "FINAL_SUMMARY_REQUIRED"
+    assert loop.trace.steps[3].status == "COMPLETED"

@@ -60,6 +60,7 @@ class InvestigationState(TypedDict):
     outcome: NotRequired[str]
     report: NotRequired[InvestigationReport]
     agent_done: NotRequired[bool]
+    agent_retry: NotRequired[bool]
 
 
 def load_snapshot(settings: Settings, tenant_id: UUID, incident_id: UUID) -> IncidentSnapshot:
@@ -479,7 +480,9 @@ def build_investigation_graph(settings: Settings, catalog: SignalCatalog | None 
         graph.add_conditional_edges("agent_prepare",
                                     lambda s: "agent_report" if s["agent_done"] else "agent_plan")
         graph.add_conditional_edges(
-            "agent_plan", lambda s: "agent_report" if s["agent_done"] else "agent_observe"
+            "agent_plan",
+            lambda s: ("agent_report" if s["agent_done"]
+                       else "agent_plan" if s.get("agent_retry") else "agent_observe"),
         )
         graph.add_conditional_edges("agent_observe",
                                     lambda s: "agent_report" if s["agent_done"] else "agent_plan")

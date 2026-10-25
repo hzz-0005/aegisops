@@ -20,6 +20,10 @@ from .root_cause_gate import evaluate_root_cause_gate
 from .tool_registry import TOOL_DESCRIPTIONS, ToolRegistry
 
 AGENT_GRAPH_VERSION = "readonly-agent-v3-mechanism-gate"
+# A malformed or non-conforming model response can be retried within the same
+# call budget; transport/configuration failures must not (they would burn quota
+# without any chance of a different outcome).
+RETRYABLE_DECISION_ERRORS = {"INVALID_MODEL_DECISION", "FINAL_SUMMARY_REQUIRED"}
 SYSTEM_INSTRUCTION = """你是只读运维调查员，通过实际观测反复更新候选假设。
 只返回符合下列形状的JSON，不写Markdown：
 {"decision":"TOOL或FINISH","reason":"中文取证理由或停止理由",
@@ -236,12 +240,19 @@ class AgentLoop:
             step.elapsed_ms = int((time.monotonic() - started) * 1000)
             self.journal.save(self.trace)
         if step.error_code:
+            if (step.error_code in RETRYABLE_DECISION_ERRORS
+                    and self.trace.model_calls
+                    < self.settings.investigation_agent_model_calls):
+                # Strict validation stays untouched: one malformed response costs
+                # a planner attempt inside the same budget instead of ending the
+                # whole investigation on the first try.
+                return {"agent_done": False, "agent_retry": True}
             self.stop(step.error_code)
         elif not self.guard():
             pass
         elif step.decision and step.decision.decision == "FINISH":
             self.stop("MODEL_FINISHED")
-        return {"agent_done": bool(self.trace.stop_reason)}
+        return {"agent_done": bool(self.trace.stop_reason), "agent_retry": False}
 
     def observe(self, state: dict) -> dict:
         if not self.guard():
